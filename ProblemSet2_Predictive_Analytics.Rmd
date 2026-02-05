@@ -1,0 +1,174 @@
+---
+title: "Predictive Analysis - Problem Set 2 : Linear Regression"
+author: "Swapnil Banerjee"
+date: "2026-01-31"
+output: html_document
+---
+```{r}
+rm(list = ls())
+```
+
+
+**1. Problem to demonstrate that the population regression line is fixed, but least square regression line varies**
+
+Suppose the population regression line is given by Y = 2 + 3x, while the data
+comes from the model y = 2 + 3x + ε.
+
+Step 1: For x in the range [5,10] graph the population regression line.
+
+Step 2: Generate xi(i = 1, 2, .., n) from Uniform(5, 10) and εi(i = 1, 2, .., n)
+from N(0, 4^2). Hence, compute y1, y2, .., yn.
+
+Step 3: On the basis of the data (xi, yi)(i = 1, 2, .., n) generated in Step 2, report the least squares regression line.
+
+Step 4: Repeat steps 2-3 five times. Graph the 5 least squares regression lines
+over the population regression line obtained in Step 1. Interpret the findings.
+
+Take n = 50. Set the seed as seed=123.
+
+```{r}
+set.seed(123)
+x1=seq(5,10,length.out=200);x1
+y1=2+3*x1
+plot(x1,y1,type='l',col="red",lwd=3)
+
+sim_results <- data.frame(
+  iteration = 1:5,
+  intercept = numeric(5),
+  slope = numeric(5)
+)
+
+for (i in 1:5){
+  x = runif(50, 5, 10)
+  eps = rnorm(50, 0, 4)
+  y = 2 + 3*x + eps
+  mod = lm(y ~ x)
+  abline(mod, col = i)
+  sim_results$intercept[i] =coef(mod)[1]
+  sim_results$slope[i]= coef(mod)[2]
+  print(summary(mod)$coefficients) # More detailed output
+}
+
+legend("topleft",
+       legend = paste(1:5),
+       col = 1:5,
+       lty = 1,
+       lwd = 2,
+       title = "Model Runs")
+
+sim_results
+```
+
+**2. Problem to demonstrate that βˆ0 and βˆ minimizes RSS**
+
+Step 1: Generate xi from Uniform(5, 10) and mean center the values. Generate
+εi from N(0, 1). Calculate yi = 2 + 3xi + εi, i = 1,2,.., n. Take n=50 and seed=123.
+
+Step 2: Now imagine that you only have the data on (xi, yi), i = 1, 2, .., n,
+without knowing the mechanism that was used to generate the data in step 1.
+Assuming a linear regression of the type yi = β0 + βxi + εi, and based on these data (xi, yi), i = 1, 2, .., n, obtain the least squares estimates of β0 and β.
+
+Step 3: Take a large number of grid values of (β0, β) that also include the least
+squares estimates obtained from step 2. Compute the RSS for each parametric
+choice of (β0, β), where RSS = (y1 − β0 − βx1)^2 + (y2 − β0 − βx2)^2 + ....(yn −β0 − βxn)^2. Find out for which combination of (β0, β), RSS is minimum.
+
+```{r}
+n <- 50
+xi <- runif(n, 5, 10)
+xi_std <- xi - mean(xi)
+eps <- rnorm(n, 0, 1)
+y <- 2 + 3 * xi_std + eps
+
+fit <- lm(y ~ xi_std)
+beta0_hat <- coef(fit)[1]
+beta_hat <- coef(fit)[2]
+
+beta0_grid <- seq(beta0_hat - 2, beta0_hat + 2, length = 51)
+beta_grid <- seq(beta_hat - 2, beta_hat + 2, length = 51)
+
+RSS <- matrix(NA, 50, 50)
+
+for (i in 1:50) {
+  for (j in 1:50) {
+    RSS[i, j] <- sum((y - beta0_grid[i] - beta_grid[j] * xi)^2)
+  }
+}
+RSS
+which(RSS == min(RSS), arr.ind = TRUE)
+
+```
+
+**3. Problem to demonstrate that least square estimators are unbiased**
+
+Step 1: Generate xi(i = 1, 2, .., n) from Uniform(0, 1), εi(i = 1, 2, .., n) from
+N(0, 1) and hence generate y using yi = β0 + βxi + εi. (Take β0 = 2, β = 3).
+
+Step 2: On the basis of the data (xi, yi)(i = 1, 2, .., n) generated in Step 1, obtain the least square estimates of β0 and β.
+
+Repeat Steps 1-2, R = 1000 times. In each simulation obtain βˆ0 and βˆ. Finally,
+the least-square estimates will be given by the average of these estimated values.
+Compare these with the true β0 and β and comment.
+
+Take n = 50 and seed=123.
+
+```{r}
+set.seed(123)
+n3 <- 50
+R <- 10000
+
+beta0_hat_vec <- array()
+beta_hat_vec <- array()
+eps3 <- rnorm(n3,0,1)
+
+for(r in 1:R){
+  x3 <- runif(n3,0,1)
+  y3 <- 2 + 3*x3 + eps3
+  
+  fit3 <- lm(y3 ~ x3)
+  beta0_hat_vec[r] <- coef(fit3)[1]
+  beta_hat_vec[r] <- coef(fit3)[2]
+}
+
+predicted_beta0_hat <- sum(beta0_hat_vec)/R
+predicted_beta0_hat
+
+predicted_beta_hat_vec <- sum(beta_hat_vec)/R
+predicted_beta_hat_vec
+```
+
+**4. Comparing several simple linear regressions**
+
+Attach “Boston” data from MASS library in R. Select median value of owner-
+occupied homes, as the response and per capita crime rate, nitrogen oxides concentration, proportion of blacks and percentage of lower status of the population as predictors.
+
+(a) Selecting the predictors one by one, run four separate linear regressions to
+the data. Present the output in a single table.
+(b) Which model gives the best fit?
+(c) Compare the coefficients of the predictors from each model and comment on
+the usefulness of the predictors.
+
+```{r}
+library(MASS)
+data(Boston)
+
+fit1 <- lm(medv ~ crim, data=Boston)
+fit2 <- lm(medv ~ nox, data=Boston)
+fit3 <- lm(medv ~ black, data=Boston)
+fit4 <- lm(medv ~ lstat, data=Boston)
+
+summary_table <- data.frame(
+  Model = c("crim","nox","black","lstat"),
+  Intercept = c(coef(fit1)[1], coef(fit2)[1], coef(fit3)[1], coef(fit4)[1]),
+  Slope = c(coef(fit1)[2], coef(fit2)[2], coef(fit3)[2], coef(fit4)[2]),
+  R2 = c(summary(fit1)$r.squared,
+         summary(fit2)$r.squared,
+         summary(fit3)$r.squared,
+         summary(fit4)$r.squared)
+)
+
+print(summary_table)
+
+best_model <- summary_table[which.max(summary_table$R2), ]
+best_model
+```
+
