@@ -1,0 +1,167 @@
+---
+title: "Predictive_Analytics_Problem_Set3"
+author: "Swapnil_Banerjee_719"
+date: "2026-02-06"
+output: html_document
+---
+
+### 2. Problem to demonstrate the role of qualitative (nominal) predictors in addition to quantitative predictors in multiple linear regression.
+
+Attach “Credits” data from R. Regress “balance” on
+(a) “gender” only.
+```{r}
+data("Credit", package = "ISLR")
+model21 = lm(Balance~Gender, data = Credit) 
+summary(model21)
+```
+
+(b) “gender” and “ethnicity” .
+```{r}
+model22 = lm(Balance~Gender+Ethnicity, data = Credit)
+summary(model22)
+model22_interaction = lm(Balance~Gender+Ethnicity+(Gender*Ethnicity), data = Credit)
+summary(model22_interaction)
+```
+
+(c) “gender”, “ethnicity”, “income”.
+```{r}
+model23 = lm(Balance~Gender+Ethnicity+Income, data = Credit)
+summary(model23)
+model23_interaction = lm(Balance~Gender+Ethnicity+(Gender*Ethnicity)+(Ethnicity*Income)+(Income*Gender), data = Credit)
+summary(model23_interaction)
+```
+
+
+(d) Output all the regressions in (a)-(c) in a single table using stargazer. Comment on the significant coefficients in each of the models.
+```{r}
+library("stargazer")
+stargazer(model21, model22, model23, type = "text", title = "Regression Results for Balance", out = "balance_regression_results.txt")
+stargazer(model21, model22, model23, type = "html", title = "Regression Results for Balance", out = "balance_regression_results.html")
+
+stargazer(model21, model22_interaction, model23_interaction, type = "text", title = "Regression Results for Balance Interaction", out = "balance_regression_interaction_results.txt")
+stargazer(model21, model22_interaction, model23_interaction, type = "html", title = "Regression Results for Balance Interaction", out = "balance_regression_interaction_results.html")
+
+```
+
+
+(e) Explain how gender affects “balance” in each of the models (a)- (c) .
+
+ANSWER: In model for only gender, the $R^2$ is 0.0004611. Therefore, Gender alone is not a good predictor for Balance. 
+In model for gender and ethnicity, the $R^2$ is 0.001. Therefore,  $R^2$ is slightly higher than the previous model but it doe not explain the variance much better either. Hence, this model is also not very good, even though it is better than the previous one.
+In the model for Gender, Ethnicity and Income, the $R^2$ is 0.22. Hence, there is a significant portion of the variance in Balance compared to the previous two models. Therefore, it is a much better model than the previous two models.
+
+
+(f) Compare the average credit card balance of a male African with a male
+Caucasian on the basis of model (b).
+```{r}
+coef(model22)["EthnicityCaucasian"]
+
+```
+
+The coefficient of EthnicityCaucasian represents the expected difference in average credit card balance between a Caucasian male and an African American male.A negative value indicates African Americans carry higher balances.
+
+(g) Compare the average credit card balance of a male African with a male Caucasian when each earns 100,000 dollars. For comparison, use the model in (c).
+```{r}
+coef(model23)["EthnicityCaucasian"]
+
+```
+
+When income is fixed at $100,000, a Caucasian male is expected to have an average credit card balance approximately 6.45 units higher than an African American male.
+Since income is held constant, this difference represents the independent effect of ethnicity on credit card balance.
+
+(h) Compare and comment on the answers in (f) and (g)
+
+The estimated difference in credit card balance changes from −12.53 in model (b) to +6.45 in model (c) after including income in the regression.
+This sign reversal indicates that income was a confounding variable.
+In the model without income, African American males appear to have higher balances because they tend to have lower income levels on average. After controlling for income, the true relationship is revealed: Caucasian males have slightly higher balances.
+Hence, failing to include income leads to a misleading conclusion.
+
+(i) Based on the model in (c), predict the credit card balance of a female Asian whose income is 2000,000 dollars.
+
+```{r}
+new_person <- data.frame(
+  Gender = "Female",
+  Ethnicity = "Asian",
+  Income = 200
+)
+
+predict(model23, newdata = new_person)
+
+```
+
+
+(j) Check the goodness of fit of the different models in (a) -(c) in terms of AIC, BIC and adjusted R2. Which model would you prefer?
+```{r}
+AIC(model21, model22, model23)
+BIC(model21, model22, model23)
+summary(model21)$adj.r.squared
+summary(model22)$adj.r.squared
+summary(model23)$adj.r.squared
+```
+
+The model with the highest $R^2$ is preferred,i.e.,Model (C).
+
+
+### 4. Problem to demonstrate the impact of ignoring interaction term in multiple linear regression
+
+Consider a simulation setting where the data is generated as follows:
+
+```{r simulation-setup}
+set.seed(123)
+
+n <- 100      
+R <- 1000       
+
+config1 <- c(-2.5, 1.2, 2.3, 0.001)  
+config2 <- c(-2.5, 1.2, 2.3, 3.1)    
+
+
+run_simulation <- function(n, R, beta_params) {
+  beta0 <- beta_params[1]
+  beta1 <- beta_params[2]
+  beta2 <- beta_params[3]
+  beta3 <- beta_params[4]
+  
+  mse_correct <- numeric(R)
+  mse_naive <- numeric(R)
+  
+  for (r in 1:R) {
+    # Step 1: Generate x1 from Normal(0,1)
+    x1 <- rnorm(n, mean = 0, sd = 1)
+    
+    # Step 2: Generate x2 from Bernoulli(0.3)
+    x2 <- rbinom(n, size = 1, prob = 0.3)
+    
+    # Step 3: Generate response with interaction
+    epsilon <- rnorm(n, mean = 0, sd = 1)
+    y <- beta0 + beta1*x1 + beta2*x2 + beta3*(x1*x2) + epsilon
+    
+    # Step 4: Fit both models
+    model_correct <- lm(y ~ x1 + x2 + x1:x2)
+    model_naive <- lm(y ~ x1 + x2)
+    
+    # Computing MSE
+    mse_correct[r] <- mean(residuals(model_correct)^2)
+    mse_naive[r] <- mean(residuals(model_naive)^2)
+  }
+  
+  return(list(
+    avg_mse_correct = mean(mse_correct),
+    avg_mse_naive = mean(mse_naive),
+    mse_correct = mse_correct,
+    mse_naive = mse_naive
+  ))
+}
+```
+
+```{r first run}
+run_simulation(100,1000,c(-2.5,1.2,2.3,0.001))
+```
+
+When the true interaction coefficient is negligible (β₃ = 0.001), omitting the interaction term has virtually **no impact** on model performance.
+
+```{r second run}
+run_simulation(100,1000,c(-2.5,1.2,2.3,3.1))
+```
+
+When the true interaction coefficient is large (β₃ = 3.1), omitting the interaction term has a **big impact** on model performance.
