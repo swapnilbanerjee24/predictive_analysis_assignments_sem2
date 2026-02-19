@@ -1,0 +1,302 @@
+---
+title: "Predictive Analytics - Problem Set 3 & 4"
+author: "719 - Swapnil Banerjee"
+date: "2026-02-15"
+output: html_document
+---
+
+### Problem Set 3: 
+#### Q.5 Problem to demonstrate the utility of non-linear regression over linear regression
+
+##### Get the fgl data set from “MASS” library
+```{r}
+library(MASS)
+data("fgl")
+str(fgl)
+head(fgl)
+```
+
+The dataset contains:\
+RI → Refractive Index (response)\
+Na → Sodium\
+Mg → Magnesium\
+Al → Aluminium\
+Si → Silicon\
+K → Potassium\
+Ca → Calcium\
+Ba → Barium\
+Fe → Iron\
+type → glass type (we focus on Vehicle Window glass)\
+
+```{r}
+fgl_veh = subset(fgl,fgl$type == "Veh")
+head(fgl_veh)
+
+```
+
+
+(a) Considering the refractive index (RI) of “Vehicle Window glass” as the variable of interest and assuming linearity of regression, run multiple linear regression of RI on different metallic oxides. From the p value, report which metallic oxide best explains the refractive index.\
+
+
+We regress: RI= $β_0$+$β_1$Na+$β_2$Mg+$β_3$Al+$β_4$Si+$β_5$K+$β_6$Ca+$β_7$Ba+$β_8$Fe+$ϵ$
+
+```{r}
+full_model = lm(RI~Na+Mg+Al+Si+K+Ca+Ba+Fe, data=fgl_veh)
+summary(full_model)
+```
+**Interpretation**\
+We know that the element with lowest p-value and highest t-statistic value will be the best predictor.\
+Here we observe that "Fe" (Iron) is the best oxide for predicting the refractive index of vehicle glass window.\
+
+
+(b) Run a simple linear regression of RI on the best predictor chosen in (a).\
+
+RI= $β_0$ + $β_1$Fe + $ϵ$
+```{r}
+simple_model= lm(RI ~ Fe, data= fgl_veh)
+summary(simple_model)
+```
+
+**Interpretation**\
+The R$^2$ value of this model is 0.2097, hence we conclude that the oxide "Fe" (Iron) explains 20.97% variability in the Refractive Index (RI) of the vehicle glass window. \
+
+
+(c) Can you further improve the regression of the refractive index of “Vehicle Window glass” on the predictor chosen by you in part (a)? Give the new fitted model and compare its performance with the model in (b).
+
+```{r}
+# Plotting to check the relationship between RI and Fe
+plot(fgl_veh$Fe, fgl_veh$RI,
+     pch=19, col="red",
+     main="RI vs Iron",
+     xlab="Iron",
+     ylab="Refractive Index")
+
+```
+**Interpretation**\
+Here, we observe that there is no linear relationship between RI and Fe, rather we see a curvy relation between the two, hence we try fitting a quadratic regression to improve the fit.\
+
+
+RI= $β_0$ + $β_1$Fe + $β_2$Fe$^2$ + $ϵ$
+
+```{r}
+quad_model = lm(RI ~ Fe + I(Fe^2), data= fgl_veh)
+summary(quad_model)
+```
+
+**Interpretation**\
+The R$^2$ value of this Quadratic model is 0.3554, hence we see that this model explains 35.54% variability on refractive index of vehicle glass window.\
+
+```{r}
+summary(simple_model)$r.squared
+summary(quad_model)$r.squared
+```
+**Interpretation**\
+Hence we see a 14.57% increase in the explanation of variability of Iron on Refractive Index of Vehicle Glass Window.
+
+
+
+-----------------------------------------------------------------------------------------------------------------------------
+
+
+### Problem Set 4
+#### Q.1 Problem to demonstrate multicollinearity.
+
+##### Consider the Credit data in the ISLR library. Choose balance as the response and Age, Limit and Rating as the predictors
+
+```{r}
+library(ISLR)
+library(stargazer)
+library(car)
+data("Credit")
+str(Credit)
+head(Credit)
+```
+
+We have been specified to keep: \
+Response → Balance\
+Predictors → Age, Limit, Rating\
+
+(a) Make a scatter plot of (i) Age versus Limit and (ii) Rating Versus Limit.
+Comment on the scatter plot.\
+
+```{r plot}
+par(mfrow=c(1,2))
+
+#(i) Age vs Limit
+plot(Credit$Age, Credit$Limit,
+     main="Age vs Limit",
+     xlab="Age",
+     ylab="Limit",
+     col="blue", pch=19)
+
+
+#(ii) Rating vs Limit
+plot(Credit$Rating, Credit$Limit,
+     main="Rating vs Limit",
+     xlab="Rating",
+     ylab="Limit",
+     col="red", pch=19)
+
+```
+
+**Interpretation**\
+(i). The scatter appears random, there is proper pattern observed and there is weak collinearity between the two.\
+(ii). The scatter appears linear, we see a strong positive relationship between Rating and Limit.\
+
+
+
+(b) Run three separate regressions: (i) Balance on Age and Limit (ii) Balance on Age, Rating and Limit (iii) Balance on Rating and Limit. Present all the regression output in a single table using stargazer. What is the marked difference that you can observe from the output?\
+
+
+Balance = $β_0$ + $β_1$Age + $β_2$Limit + $ϵ$\
+```{r}
+model_1 = lm(Balance ~ Age + Limit, data = Credit)
+```
+
+Balance = $β_0$ + $β_1$Age + $β_2$Rating + $β_3$Limit + $ϵ$\
+```{r}
+model_2 = lm(Balance ~ Age + Rating + Limit, data = Credit)
+```
+
+Balance = $β_0$ + $β_1$Rating + $β_2$Limit + $ϵ$\
+```{r}
+model_3 = lm(Balance ~ Rating + Limit, data = Credit)
+```
+
+```{r}
+stargazer(model_1,model_2,model_3, type="text",title="Regression Comparison Table")
+```
+**Interpretation**\
+ In the first 2 models, Age is highly significant at 1% level implying Age has a statistically strong effect on balance. Age has negative impact on Balance since the coefficients of Age in both the models is negative.\
+
+In the first model, Limit was highly significant at 1% level but in second and third model where a new predictor Rating was introduced, Limit became statistically insignificant. This suggests, there exists multicollinearity between Rating and Limit. When both enter the model, Rating takes up most explanatory power and remains important even when Limit is included.This means Rating is a stronger determinant of balance than Limit.\
+
+
+
+(c) Calculate the variance inflation factor (VIF) and comment on multicollinearity.\
+
+The Variance Inflation Factor (VIF) reveals the presence and severity of multicollinearity across the models.\
+
+```{r}
+vif(model_1)
+vif(model_2)
+vif(model_3)
+```
+**Interpretation**\
+In the Age and Limit model, both Age and Limit have VIF values close to 1 (≈1.01), indicating no multicollinearity meaning the predictors are almost completely independent of each other, and their coefficient estimates are stable and reliable.\
+
+However, once Rating is introduced in the Age, Limit and Rating model, the VIF values for Limit (≈160.59) and Rating (≈160.67) increase significantly, while Age remains near 1 (≈1.01).\
+
+Similarly, in the Limit and Rating model, both variables again show extremely high VIF values (≈160.49). A VIF exceeding 10 is typically considered serious; values above 100 indicate extreme multicollinearity. This means Limit and Rating are almost perfectly linearly correlated, causing inflated standard errors and making individual coefficient estimates unstable and statistically unreliable. This explains why Limit becomes insignificant when Rating is added in the model. In contrast, Age remains unaffected because it is not strongly correlated with the other predictors.\
+
+Overall, the output provides strong statistical evidence of severe multicollinearity between Limit and Rating, confirming the pattern observed in the scatter plot and regression table.\
+
+
+----------------------------------------------------------------------------------------------------------------------------------------------
+
+
+#### Q.2 Problem to demonstrate the detection of outlier, leverage and influential points.
+
+##### Attach “Boston” data from MASS library in R. Select median value of owneroccupied homes, as the response and per capita crime rate, nitrogen oxides concentration, proportion of blacks and percentage of lower status of the population as predictors.
+
+
+```{r}
+library(MASS)
+data("Boston")
+str(Boston)
+head(Boston)
+```
+
+We have been specified to keep: \
+Response → medv (median value of owner-occupied homes in $1000s)\
+Predictors → crim (per capita crime rate by town), nox (nitrogen oxides concentration (parts per 10 million), black (the proportion of blacks by town), lstat (lower status of the population)\
+
+
+The objective is to fit a multiple linear regression model of the response on the predictors.\
+
+medv = $β_0$ + $β_1$crim + $β_2$nox + $β_3$black + $β_4$lstat + $ϵ$\
+
+```{r}
+boston_model = lm(medv ~ crim + nox + black + lstat, data=Boston)
+summary(boston_model)
+
+```
+
+With reference to this problem, detect outliers, leverage points and influential points if any. \
+
+- Plotting a Residual Plot\
+```{r}
+plot(boston_model$fitted.values, resid(boston_model),
+     xlab="Fitted Values",
+     ylab="Residuals",
+     main="Residuals vs Fitted")
+abline(h=0,col="blue",lwd=2)
+```
+**Interpretation**\
+After finding the residual plot we can clearly see that there are some outliers present in both positive and negative direction. Finding out leverage and influential points from this plot is not possible, i.e we cannot directly comment on the same from just this plot.\
+
+
+
+- Finding Potential Outliers\
+
+First, we find out the standardized residuals of the fitted model and then a point is declared as potential outliers if its standard residual is less than -2 and and greater than 2. \
+
+```{r}
+#Finding standardized residuals
+std.res=rstandard(boston_model)
+
+#Detecting Potential Outlier
+outliers=which(abs(std.res)>2)
+outliers
+length(outliers)
+```
+**Interpretation**\
+We can clearly see that there are 31 points as  potential outliers in this standardized fitted model which does not fit the model well.\
+
+
+- Finding Leverage Points\
+
+First, we find out the diagonal elements of the hat matrix. Then we calculate a cutoff point L=3*(p+1)/n where p is the number of predictors and n is number of rows. If the hat values exceed the leverage value then we call the points as leverages points.\
+
+```{r}
+diag_val=hatvalues(boston_model)
+
+n=nrow(Boston) #rows
+p=4  #number of predictors
+
+#Calculating the leverage values
+cutoff=3*(p+1)/n
+cutoff
+
+# High leverage observations
+leverage_points=which(diag_val>cutoff)
+leverage_points
+length(leverage_points)
+```
+**Interpretation**\
+We observe that there are 29 leverage points present in total which means these are points with high predictor values and may influence the model. \
+
+
+
+- Finding Influential Points\
+
+We find out the Cook's distance $D_i$ which is a function of standardized residuals and elements of hat matrix.\
+
+If for a data point $D_i$>1, we can say that point is an influential point.\
+
+```{r}
+#Calculating the Di values
+cook_distance=cooks.distance(boston_model)
+
+influential=which(cook_distance>1)
+length(influential)
+```
+
+**Interpretation**\
+We see that there exist no such point where $D_i$>1, so we conclude that in this model there exists no such influential points. 
+
+
+
+
+
+-----------------------------------------------------------------------------------------------------------
