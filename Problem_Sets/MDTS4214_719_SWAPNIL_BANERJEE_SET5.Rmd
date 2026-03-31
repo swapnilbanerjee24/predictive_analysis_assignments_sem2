@@ -1,0 +1,247 @@
+---
+title: "Assignment_5"
+author: "Swapnil_Banerjee_719"
+date: "2026-02-26"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## **PRACTICE SET 3** 
+
+### 3. Problem to demonstrate the role of qualitative (ordinal) predictors in addition to quantitative predictors in multiple linear regression.
+
+Consider “diamonds” data set in R. It is in the ggplot2 package. Make a list of all the ordinal categorical variables. Identify the response.
+```{r}
+library(ggplot2)
+data("diamonds")
+View(diamonds)
+```
+ANSWER: The ordinal categorical variables in the diamonds dataset are "cut", "color", and "clarity". The response variable is "price".
+
+(a) Run a linear regression of the response on the quality of cut. Write the fitted regression model.
+```{r}
+model_cut <- lm(price ~ cut, data = diamonds)
+```
+
+(b) Test whether the expected price of diamond with premium cut is significantly different from that of the ideal cut.
+```{r}
+summary(model_cut)
+```
+(c) What is the expected price of a diamond of ideal cut?
+```{r}
+ideal_price <- predict(model_cut, newdata = data.frame(cut = "Ideal"))
+ideal_price
+```
+(d) Modify the regression model in (a) by incorporating the predictor “table”. Write the fitted regression model.
+```{r}
+model_cut_table <- lm(price ~ cut + table, data = diamonds)
+model_cut_table
+```
+
+(e) Test for the significance of “table” in predicting the price of diamond.
+```{r}
+summary(model_cut_table)
+```
+(f)  Find the average estimated price of a diamond with an average table value
+and which is of fair cut.
+```{r}
+average_table <- mean(diamonds$table)
+average_table
+pred= predict(model_cut_table,newdata = data.frame(cut="Fair",table=average_table));pred
+```
+
+## **Problem Set 5: K nearest neighbors regression**
+
+```{r}
+set.seed(123)
+library(class)
+#library(caret)
+library(FNN)
+```
+
+
+### Q1. Problem to demonstrate the utility of K nearest neighbour regression over least squares regression.
+
+#### Consider a setting with n = 1000 observations. Generate
+
+##### (i) x1i from N(0,22) and x2i from Poisson(λ = 1.5).
+
+##### (ii) ϵi from N(0,1).
+
+##### (iii) yi = −2 +1.4x1i −2.6x2i +ϵi.
+```{r}
+set.seed(123)
+
+n <- 1000
+
+x1 <- rnorm(n, mean = 0, sd = 2)
+x2 <- rpois(n, lambda = 1.5)
+epsilon <- rnorm(n, mean = 0, sd = 1)
+
+y <- -2 + 1.4*x1 - 2.6*x2 + epsilon
+
+data <- data.frame(x1, x2, y)
+```
+
+
+##### Split the data into train and test sets. Keep the first 800 observations as training data and the remaining as test data. 
+```{r}
+train_data <- data[1:800, ]
+test_data  <- data[801:1000, ]
+```
+
+
+##### Work out the following:
+###### 1. Fit a multiple linear regression equation of y on x1 and x2. Calculate test MSE.
+```{r}
+lm_model <- lm(y ~ x1 + x2, data = train_data)
+
+summary(lm_model)
+```
+```{r}
+pred_lm <- predict(lm_model, newdata = test_data)
+
+mse_lm <- mean((test_data$y - pred_lm)^2)
+
+mse_lm
+```
+
+
+##### 2. Fit a KNN model with k = 1,2,5,9,15. Calculate test MSE for each choice of k.
+```{r}
+library(FNN)
+
+train_x <- train_data[, c("x1", "x2")]
+test_x  <- test_data[, c("x1", "x2")]
+train_y <- train_data$y
+```
+
+```{r k=1}
+pred_k1 <- knn.reg(train = train_x, test = test_x, y = train_y, k = 1)$pred
+
+mse_k1 <- mean((test_data$y - pred_k1)^2)
+mse_k1
+```
+
+```{r k=2}
+pred_k2 <- knn.reg(train = train_x, test = test_x, y = train_y, k = 2)$pred
+
+mse_k2 <- mean((test_data$y - pred_k2)^2)
+mse_k2
+```
+
+```{r k=5}
+pred_k5 <- knn.reg(train = train_x, test = test_x, y = train_y, k = 5)$pred
+
+mse_k5 <- mean((test_data$y - pred_k5)^2)
+mse_k5
+```
+
+```{r k=9}
+pred_k9 <- knn.reg(train = train_x, test = test_x, y = train_y, k = 9)$pred
+
+mse_k9 <- mean((test_data$y - pred_k9)^2)
+mse_k9
+```
+
+```{r k=15}
+pred_k15 <- knn.reg(train = train_x, test = test_x, y = train_y, k = 15)$pred
+
+mse_k15 <- mean((test_data$y - pred_k15)^2)
+mse_k15
+```
+
+##### Suppose the data in Step (iii) is generated as :
+##### yi = 1/(−2+1.4x1i −2.6x2i +2.9x21i) + 3.1sin(x2i) − 1.5x1ix22i + ϵi.
+
+##### Work out the problems in (1) and (2). Compare and comment on the results.
+
+```{r}
+epsilon2 <- rnorm(n, mean = 0, sd = 1)
+
+y_nl <- 1/(-2 + 1.4*x1 - 2.6*x2 + 2.9*(x1^2)) + 3.1*sin(x2) - 1.5*x1*(x2^2) + epsilon2
+
+data_nl <- data.frame(x1, x2, y = y_nl)
+```
+
+```{r rain-test split}
+train_nl <- data_nl[1:800, ]
+test_nl  <- data_nl[801:1000, ]
+```
+
+```{r}
+lm_model_nl <- lm(y ~ x1 + x2, data = train_nl)
+
+summary(lm_model_nl)
+```
+
+```{r}
+pred_lm_nl <- predict(lm_model_nl, newdata = test_nl)
+
+mse_lm_nl <- mean((test_nl$y - pred_lm_nl)^2)
+
+mse_lm_nl
+```
+
+```{r}
+train_x_nl <- train_nl[, c("x1", "x2")]
+test_x_nl  <- test_nl[, c("x1", "x2")]
+train_y_nl <- train_nl$y
+```
+
+```{r}
+pred_k1_nl <- knn.reg(train = train_x_nl, test = test_x_nl, y = train_y_nl, k = 1)$pred
+
+mse_k1_nl <- mean((test_nl$y - pred_k1_nl)^2)
+mse_k1_nl
+```
+
+```{r}
+pred_k2_nl <- knn.reg(train = train_x_nl, test = test_x_nl,
+                      y = train_y_nl, k = 2)$pred
+
+mse_k2_nl <- mean((test_nl$y - pred_k2_nl)^2)
+mse_k2_nl
+```
+```{r}
+pred_k5_nl <- knn.reg(train = train_x_nl, test = test_x_nl,
+                      y = train_y_nl, k = 5)$pred
+
+mse_k5_nl <- mean((test_nl$y - pred_k5_nl)^2)
+mse_k5_nl
+```
+
+```{r}
+pred_k9_nl <- knn.reg(train = train_x_nl, test = test_x_nl,
+                      y = train_y_nl, k = 9)$pred
+
+mse_k9_nl <- mean((test_nl$y - pred_k9_nl)^2)
+mse_k9_nl
+```
+
+```{r}
+pred_k15_nl <- knn.reg(train = train_x_nl, test = test_x_nl,
+                       y = train_y_nl, k = 15)$pred
+
+mse_k15_nl <- mean((test_nl$y - pred_k15_nl)^2)
+mse_k15_nl
+```
+#### Interpretation:
+
+##### Linear True Model:
+1.Linear regression gives lowest Test MSE.
+2.KNN slightly worse.
+3.Because the true relationship is linear.
+
+
+##### Nonlinear True Model
+
+1.Linear regression performs poorly (misspecified).
+2.KNN performs better for moderate k (usually 5 or 9).
+3.Small k → high variance.
+4.Large k → high bias.
+
+
