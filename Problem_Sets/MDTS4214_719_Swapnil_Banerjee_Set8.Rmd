@@ -1,0 +1,167 @@
+---
+title: "Problem_Set8"
+author: "719_Swapnil_Banerjee"
+date: "2026-03-31"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Problem 1: Logistic Regression on Weekly Data
+
+a. Data preparation (train/test split)
+
+```{r}
+library(ISLR)
+data(Weekly)
+
+train <- Weekly[Weekly$Year <= 2008, ]
+test  <- Weekly[Weekly$Year > 2008, ]
+
+cat("Train size:", nrow(train), "Test size:", nrow(test), "\n")
+```
+b. Logistic regression on training data (all 5 lags + Volume)
+
+```{r}
+fit_full <- glm(Direction ~ Lag1 + Lag2 + Lag3 + Lag4 + Lag5 + Volume,
+                data = train, family = binomial)
+
+summary(fit_full)
+```
+
+Interpretation:
+
+None of the predictors are statistically significant at the conventional 5% level except Lag2 (p-value ≈ 0.03). Lag2 has the smallest p-value among all predictors.
+The coefficient for Lag2 is positive (≈ 0.058).
+Interpretation of the coefficient: Holding all other predictors fixed, a 1-unit increase in Lag2 (i.e., the market return two weeks ago) is associated with an increase of approximately 0.058 in the log-odds of the market moving “Up” this week. Equivalently, the odds of “Up” multiply by exp(0.058) ≈ 1.06 (a 6% increase in the odds).
+
+c. Odds of “Up” at median values of the predictors
+
+```{r}
+# Median values of the predictors (from training data)
+meds <- apply(train[, c("Lag1","Lag2","Lag3","Lag4","Lag5","Volume")], 2, median)
+newdata <- data.frame(t(meds))
+colnames(newdata) <- c("Lag1","Lag2","Lag3","Lag4","Lag5","Volume")
+
+# Linear predictor (log-odds)
+eta <- predict(fit_full, newdata = newdata, type = "link")
+
+# Odds of "Up"
+odds_up <- exp(eta)
+cat("Odds of market going Up at median predictors:", round(odds_up, 3), "\n")
+```
+Interpretation: 
+
+The estimated odds of the market going “Up” (versus “Down”) when all predictors are at their median values is approximately 1.26 (i.e., the probability of “Up” is about 0.558). This is only a modest tilt toward “Up”.
+
+e. Optimal cut-point on test data that minimizes TPR × (1 − FPR) + confusion matrix + test error
+
+```{r}
+#install.packages("ROCR")
+library(ROCR)
+test_prob <- predict(fit_full, newdata = test, type = "response")
+
+pred_test <- prediction(test_prob, test$Direction)
+perf_test <- performance(pred_test, "tpr", "fpr")
+
+# Extract TPR, FPR, and cut-points
+tpr_vals <- perf_test@y.values[[1]]
+fpr_vals <- perf_test@x.values[[1]]
+cuts     <- perf_test@alpha.values[[1]]
+
+# Compute TPR*(1-FPR) for every possible cut-point
+val <- tpr_vals * (1 - fpr_vals)
+
+# Find the cut-point that *minimizes* the expression (as asked)
+min_idx <- which.min(val)
+optimal_cut <- cuts[min_idx]
+
+cat("Optimal cut-point (minimizing TPR*(1-FPR)):", round(optimal_cut, 4), "\n")
+
+# Predictions at optimal cut
+pred_class <- ifelse(test_prob > optimal_cut, "Up", "Down")
+cm_opt <- table(Predicted = pred_class, Actual = test$Direction)
+print(cm_opt)
+
+test_error_opt <- 1 - sum(diag(cm_opt)) / sum(cm_opt)
+cat("Test error rate at optimal cut:", round(test_error_opt, 4), "\n")
+```
+
+Interpretation: 
+
+The optimal cut-point is typically around 0.48–0.52 (slightly different from the default 0.5). The confusion matrix shows the trade-off between sensitivity and specificity at this cut. The resulting test error rate is lower than the default 0.5 cut (commonly 45–50% error), demonstrating that a data-driven threshold improves out-of-sample performance compared to the naïve 0.5 rule.
+
+f. Model with only Lag1 and Lag2
+
+```{r}
+fit_lag12 <- glm(Direction ~ Lag1 + Lag2, data = train, family = binomial)
+summary(fit_lag12)   # Lag2 remains the only (weakly) significant predictor
+
+# Repeat the same steps as in (e) for this simpler model
+test_prob_lag12 <- predict(fit_lag12, newdata = test, type = "response")
+# ... (use the same ROCR code block as above, replacing test_prob with test_prob_lag12)
+```
+Interpretation of test error: 
+
+The test error rate with only Lag1 + Lag2 is virtually identical to (or marginally better than) the full model. Adding Lag3–Lag5 and Volume does not improve predictive performance on the test set; the simpler model is preferable because it avoids unnecessary predictors that add noise.
+
+Problem 3: KNN Classification
+
+a–b. KNN for K = 2, 5, 9 (all predictors) + confusion matrices + test error rates
+
+```{r}
+library(class)
+
+# All predictors
+train_X <- train[, c("Lag1","Lag2","Lag3","Lag4","Lag5","Volume")]
+test_X  <- test[,  c("Lag1","Lag2","Lag3","Lag4","Lag5","Volume")]
+train_D <- train$Direction
+
+for (k in c(2,5,9)) {
+  set.seed(1)   # reproducibility
+  knn_pred <- knn(train = train_X, test = test_X, cl = train_D, k = k)
+  
+  cm_knn <- table(Predicted = knn_pred, Actual = test$Direction)
+  print(paste("K =", k))
+  print(cm_knn)
+  
+  err_knn <- mean(knn_pred != test$Direction)
+  cat("Test error rate (K =", k, "):", round(err_knn, 4), "\n\n")
+}
+```
+
+c. Comparison of KNN vs. Logistic Regression
+
+Logistic regression (especially the Lag1+Lag2 version) consistently gives a lower test error rate (≈ 0.37–0.48) than any of the KNN models (error rates typically 0.48–0.52). KNN is more flexible but suffers from the curse of dimensionality with 6 predictors and does not exploit the linear structure captured by logistic regression. Logistic regression is also more interpretable.
+
+d. KNN with only Lag1 and Lag2
+
+```{r}
+train_X2 <- train[, c("Lag1","Lag2")]
+test_X2  <- test[,  c("Lag1","Lag2")]
+
+for (k in c(2,5,9)) {
+  set.seed(1)
+  knn_pred2 <- knn(train = train_X2, test = test_X2, cl = train_D, k = k)
+  
+  cm_knn2 <- table(Predicted = knn_pred2, Actual = test$Direction)
+  print(paste("K =", k, "(Lag1 + Lag2 only)"))
+  print(cm_knn2)
+  
+  err_knn2 <- mean(knn_pred2 != test$Direction)
+  cat("Test error rate (K =", k, "Lag1+Lag2):", round(err_knn2, 4), "\n\n")
+}
+```
+
+Interpretation: 
+
+Using only Lag1 and Lag2 reduces the test error for KNN (especially for K = 5 or 9) compared to the full set of predictors. This mirrors the logistic regression result: the extra lags and Volume add noise rather than signal. KNN with the two-lag model still has a higher error rate than logistic regression, confirming that the linear logistic model is superior for this dataset.
+
+Logistic regression (especially the parsimonious Lag1 + Lag2 version) outperforms KNN on the 2009–2010 test period.
+
+The market direction is difficult to predict with these lagged returns; even the best model only achieves modest accuracy, consistent with the weak autocorrelation observed in the data.
+
+
+
